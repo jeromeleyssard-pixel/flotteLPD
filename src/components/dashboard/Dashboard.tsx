@@ -1,14 +1,19 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
-  departments,
-  maintenanceLogs as initialMaintenance,
-  trips as initialTrips,
-  users,
-  vehicles as initialVehicles,
-} from "@/lib/mockData";
-import type { MaintenanceLog, Trip, User, Vehicle } from "@/lib/types";
+  createVehicle,
+  deleteVehicle,
+  fetchFleetSnapshot,
+  updateVehicle,
+} from "@/lib/api/fleet";
+import type {
+  Department,
+  MaintenanceLog,
+  Trip,
+  User,
+  Vehicle,
+} from "@/lib/types";
 
 const cleanlinessLabels = {
   ok: "Propre",
@@ -56,25 +61,46 @@ type MaintenanceForm = {
   notes: string;
 };
 
-interface DashboardProps {
-  sessionUser: User;
-  onSessionUserChange: (user: User) => void;
-}
+type VehicleFormState = {
+  id?: string;
+  name: string;
+  licensePlate: string;
+  model: string;
+  year: string;
+  departmentId: string;
+  currentKm: string;
+  ctDueDate: string;
+  serviceDueKm: string;
+  serviceDueDate: string;
+  status: Vehicle["status"];
+};
+
+type DashboardProps = {
+  sessionUser?: User;
+  onSessionUserChange: (user?: User) => void;
+  onLogout: () => void;
+  users: User[];
+  welcomeInfo?: {
+    firstName: string;
+    lastName: string;
+    departmentId: string;
+  };
+};
 
 export default function Dashboard({
   sessionUser,
   onSessionUserChange,
+  onLogout,
+  users,
+  welcomeInfo,
 }: DashboardProps) {
-  const [selectedDepartment, setSelectedDepartment] = useState<string>(
-    sessionUser.role === "admin" ? "all" : sessionUser.departmentId,
-  );
-  const [vehiclesState, setVehiclesState] = useState<Vehicle[]>(
-    initialVehicles,
-  );
-  const [tripsState, setTripsState] = useState<Trip[]>(initialTrips);
-  const [maintenanceState, setMaintenanceState] = useState<MaintenanceLog[]>(
-    initialMaintenance,
-  );
+  const [selectedDepartment, setSelectedDepartment] = useState<string>("all");
+  const [departmentsState, setDepartmentsState] = useState<Department[]>([]);
+  const [vehiclesState, setVehiclesState] = useState<Vehicle[]>([]);
+  const [tripsState, setTripsState] = useState<Trip[]>([]);
+  const [maintenanceState, setMaintenanceState] = useState<MaintenanceLog[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   const [checkInForm, setCheckInForm] = useState<CheckInForm>({
     vehicleId: "",
@@ -97,11 +123,68 @@ export default function Dashboard({
     scheduledDate: "",
     notes: "",
   });
+  const emptyVehicleForm: VehicleFormState = {
+    id: undefined,
+    name: "",
+    licensePlate: "",
+    model: "",
+    year: "",
+    departmentId: sessionUser?.departmentId ?? welcomeInfo?.departmentId ?? "",
+    currentKm: "",
+    ctDueDate: "",
+    serviceDueKm: "",
+    serviceDueDate: "",
+    status: "available",
+  };
+  const [vehicleForm, setVehicleForm] = useState<VehicleFormState>(emptyVehicleForm);
+  const [vehicleFormMode, setVehicleFormMode] = useState<"create" | "edit">("create");
+  const [vehicleFormSubmitting, setVehicleFormSubmitting] = useState(false);
+  const [vehicleFormError, setVehicleFormError] = useState<string | null>(null);
+  const [bookingVehicleId, setBookingVehicleId] = useState<string | null>(null);
+  const [bookingError, setBookingError] = useState<string | null>(null);
+  const [isVehicleManagementOpen, setIsVehicleManagementOpen] = useState(false);
+
+  const loadSnapshot = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const snapshot = await fetchFleetSnapshot();
+      setDepartmentsState(snapshot.departments);
+      setVehiclesState(snapshot.vehicles);
+      setTripsState(snapshot.trips);
+      setMaintenanceState(snapshot.maintenance);
+    } catch (loadError) {
+      console.error("Fleet snapshot error", loadError);
+      setError("Impossible de charger les données flotte. Réessaie dans un instant.");
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  async function handleVehicleBookingToggle(vehicle: Vehicle) {
+    if (vehicle.status === "maintenance") return;
+    setBookingVehicleId(vehicle.id);
+    setBookingError(null);
+    try {
+      const nextStatus = vehicle.status === "available" ? "reserved" : "available";
+      const updated = await updateVehicle({ id: vehicle.id, status: nextStatus });
+      setVehiclesState((prev) =>
+        prev.map((entry) => (entry.id === updated.id ? updated : entry)),
+      );
+    } catch (error) {
+      console.error("Booking toggle error", error);
+      setBookingError("Impossible de mettre à jour la réservation pour le moment.");
+    } finally {
+      setBookingVehicleId(null);
+    }
+  }
 
   useEffect(() => {
-    setSelectedDepartment(
-      sessionUser.role === "admin" ? "all" : sessionUser.departmentId,
-    );
+    loadSnapshot();
+  }, [loadSnapshot]);
+
+  useEffect(() => {
+    setSelectedDepartment("all");
   }, [sessionUser]);
 
   const filteredVehicles = useMemo(() => {
@@ -127,9 +210,7 @@ export default function Dashboard({
     (vehicle) => vehicle.status === "available",
   );
   const openTrips = filteredTrips.filter((trip) => !trip.endDateTime);
-  const selectableTrips = sessionUser.role === "admin"
-    ? openTrips
-    : openTrips.filter((trip) => trip.driverId === sessionUser.id);
+  const selectableTrips = openTrips;
 
   const stats = useMemo(() => {
     const totalVehicles = filteredVehicles.length;
@@ -151,12 +232,102 @@ export default function Dashboard({
     };
   }, [vehiclesState]);
 
+  function resetVehicleForm() {
+    setVehicleForm({
+      ...emptyVehicleForm,
+      departmentId: sessionUser?.departmentId ?? welcomeInfo?.departmentId ?? "",
+    });
+    setVehicleFormMode("create");
+    setVehicleFormError(null);
+  }
+
   function formatDate(dateString?: string) {
     if (!dateString) return "—";
     return new Date(dateString).toLocaleDateString("fr-FR", {
       day: "2-digit",
       month: "short",
     });
+  }
+
+  function fillVehicleForm(vehicle: Vehicle) {
+    setVehicleForm({
+      id: vehicle.id,
+      name: vehicle.name,
+      licensePlate: vehicle.licensePlate,
+      model: vehicle.model,
+      year: vehicle.year ? String(vehicle.year) : "",
+      departmentId: vehicle.departmentId,
+      currentKm: vehicle.currentKm ? String(vehicle.currentKm) : "",
+      ctDueDate: vehicle.ctDueDate ?? "",
+      serviceDueKm: vehicle.serviceDueKm ? String(vehicle.serviceDueKm) : "",
+      serviceDueDate: vehicle.serviceDueDate ?? "",
+      status: vehicle.status,
+    });
+    setVehicleFormMode("edit");
+    setVehicleFormError(null);
+  }
+
+  function parseVehiclePayload(form: VehicleFormState) {
+    return {
+      name: form.name.trim(),
+      licensePlate: form.licensePlate.trim(),
+      model: form.model.trim(),
+      year: form.year ? Number(form.year) : undefined,
+      departmentId: form.departmentId,
+      currentKm: form.currentKm ? Number(form.currentKm) : undefined,
+      ctDueDate: form.ctDueDate || undefined,
+      serviceDueKm: form.serviceDueKm ? Number(form.serviceDueKm) : undefined,
+      serviceDueDate: form.serviceDueDate || undefined,
+      status: form.status,
+    };
+  }
+
+  async function handleVehicleSubmit(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setVehicleFormSubmitting(true);
+    setVehicleFormError(null);
+    try {
+      const payload = parseVehiclePayload(vehicleForm);
+      let saved: Vehicle;
+      if (vehicleFormMode === "edit" && vehicleForm.id) {
+        saved = await updateVehicle({ id: vehicleForm.id, ...payload });
+        setVehiclesState((prev) =>
+          prev.map((vehicle) => (vehicle.id === saved.id ? saved : vehicle)),
+        );
+      } else {
+        saved = await createVehicle(payload);
+        setVehiclesState((prev) => [saved, ...prev]);
+      }
+      resetVehicleForm();
+    } catch (saveError) {
+      console.error("Vehicle save error", saveError);
+      setVehicleFormError(
+        "Impossible d'enregistrer le véhicule. Vérifie les champs et réessaie.",
+      );
+    } finally {
+      setVehicleFormSubmitting(false);
+    }
+  }
+
+  async function handleVehicleDelete(id: string) {
+    const vehicle = vehiclesState.find((v) => v.id === id);
+    if (!vehicle) return;
+    const confirmed = window.confirm(
+      `Supprimer ${vehicle.name} (${vehicle.licensePlate}) ?`,
+    );
+    if (!confirmed) return;
+    try {
+      await deleteVehicle(id);
+      setVehiclesState((prev) => prev.filter((v) => v.id !== id));
+      if (vehicleFormMode === "edit" && vehicleForm.id === id) {
+        resetVehicleForm();
+      }
+    } catch (deleteError) {
+      console.error("Vehicle delete error", deleteError);
+      setVehicleFormError(
+        "Suppression impossible pour le moment. Réessaie plus tard.",
+      );
+    }
   }
 
   function handleStartTrip(event: React.FormEvent<HTMLFormElement>) {
@@ -167,7 +338,7 @@ export default function Dashboard({
     const newTrip: Trip = {
       id: `trip-${Date.now()}`,
       vehicleId: vehicle.id,
-      driverId: sessionUser.id,
+      driverId: sessionUser?.id || users[0]?.id || "unknown",
       departmentId: vehicle.departmentId,
       startDateTime: new Date().toISOString(),
       startKm: Number(checkInForm.startKm || vehicle.currentKm),
@@ -261,7 +432,7 @@ export default function Dashboard({
 
   function getDepartmentName(id: string) {
     if (id === "all") return "Tous";
-    return departments.find((dept) => dept.id === id)?.name ?? id;
+    return departmentsState.find((dept) => dept.id === id)?.name ?? id;
   }
 
   const recentTrips = useMemo(
@@ -275,14 +446,42 @@ export default function Dashboard({
     [filteredTrips],
   );
 
+  if (loading) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-slate-50">
+        <p className="text-sm text-slate-500">Chargement des données flotte…</p>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-slate-50 px-4">
+        <div className="rounded-3xl border border-rose-200 bg-white p-8 text-center shadow-xl">
+          <p className="mb-4 text-sm text-rose-600">{error}</p>
+          <button
+            className="rounded-2xl bg-slate-900 px-4 py-2 text-sm font-semibold text-white"
+            onClick={loadSnapshot}
+          >
+            Réessayer
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-slate-50">
       <div className="mx-auto flex max-w-6xl flex-col gap-6 px-4 py-6 sm:px-6 lg:px-8">
         <SessionBar
           sessionUser={sessionUser}
+          welcomeInfo={welcomeInfo}
           onUserChange={onSessionUserChange}
+          onLogout={onLogout}
           selectedDepartment={selectedDepartment}
           onDepartmentChange={setSelectedDepartment}
+          departments={departmentsState}
+          users={users}
         />
 
         <section className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
@@ -313,9 +512,17 @@ export default function Dashboard({
                     vehicle={vehicle}
                     statusClass={statusStyles[vehicle.status]}
                     formatDate={formatDate}
+                    canQuickBook
+                    bookingBusy={bookingVehicleId === vehicle.id}
+                    onToggleBooking={() => handleVehicleBookingToggle(vehicle)}
                   />
                 ))}
               </div>
+              {bookingError && (
+                <p className="rounded-xl bg-rose-50 px-3 py-2 text-sm text-rose-700">
+                  {bookingError}
+                </p>
+              )}
             </div>
           </article>
 
@@ -480,6 +687,227 @@ export default function Dashboard({
           </article>
         </section>
 
+        {/* Gestion des véhicules - Accordéon */}
+        <section className="rounded-2xl border border-slate-200 bg-white shadow-sm">
+          <div
+            className="w-full px-4 py-3 text-left flex items-center justify-between hover:bg-slate-50 transition-colors rounded-t-2xl cursor-pointer"
+            onClick={() => setIsVehicleManagementOpen(!isVehicleManagementOpen)}
+          >
+            <div>
+              <h2 className="text-lg font-semibold text-slate-900">Gestion des véhicules</h2>
+              <p className="text-sm text-slate-500">Ajoutez, modifiez ou supprimez des véhicules</p>
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                className="text-sm font-semibold text-emerald-600"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  resetVehicleForm();
+                  setIsVehicleManagementOpen(true);
+                }}
+              >
+                + Nouveau véhicule
+              </button>
+              <svg
+                className={`w-5 h-5 text-slate-400 transition-transform ${isVehicleManagementOpen ? 'rotate-180' : ''}`}
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+              </svg>
+            </div>
+          </div>
+          
+          {isVehicleManagementOpen && (
+            <div className="px-4 pb-4 border-t border-slate-100">
+              <form className="grid gap-3 md:grid-cols-2 mt-4" onSubmit={handleVehicleSubmit}>
+                <input
+                  required
+                  className="rounded-xl border border-slate-200 px-3 py-2 text-sm"
+                  placeholder="Nom"
+                  value={vehicleForm.name}
+                  onChange={(event) =>
+                    setVehicleForm((prev) => ({ ...prev, name: event.target.value }))
+                  }
+                />
+                <input
+                  required
+                  className="rounded-xl border border-slate-200 px-3 py-2 text-sm"
+                  placeholder="Immatriculation"
+                  value={vehicleForm.licensePlate}
+                  onChange={(event) =>
+                    setVehicleForm((prev) => ({
+                      ...prev,
+                      licensePlate: event.target.value,
+                    }))
+                  }
+                />
+                <input
+                  required
+                  className="rounded-xl border border-slate-200 px-3 py-2 text-sm"
+                  placeholder="Modèle"
+                  value={vehicleForm.model}
+                  onChange={(event) =>
+                    setVehicleForm((prev) => ({ ...prev, model: event.target.value }))
+                  }
+                />
+                <input
+                  type="number"
+                  className="rounded-xl border border-slate-200 px-3 py-2 text-sm"
+                  placeholder="Année (ex: 2022)"
+                  value={vehicleForm.year}
+                  onChange={(event) =>
+                    setVehicleForm((prev) => ({ ...prev, year: event.target.value }))
+                  }
+                />
+                <select
+                  required
+                  className="rounded-xl border border-slate-200 px-3 py-2 text-sm"
+                  value={vehicleForm.departmentId}
+                  onChange={(event) =>
+                    setVehicleForm((prev) => ({
+                      ...prev,
+                      departmentId: event.target.value,
+                    }))
+                  }
+                >
+                  <option value="">Département assigné</option>
+                  {departmentsState.map((dept) => (
+                    <option key={dept.id} value={dept.id}>
+                      {dept.name}
+                    </option>
+                  ))}
+                </select>
+                <input
+                  type="number"
+                  className="rounded-xl border border-slate-200 px-3 py-2 text-sm"
+                  placeholder="Kilométrage actuel"
+                  value={vehicleForm.currentKm}
+                  onChange={(event) =>
+                    setVehicleForm((prev) => ({ ...prev, currentKm: event.target.value }))
+                  }
+                />
+                <input
+                  type="date"
+                  className="rounded-xl border border-slate-200 px-3 py-2 text-sm"
+                  placeholder="Prochain CT"
+                  value={vehicleForm.ctDueDate}
+                  onChange={(event) =>
+                    setVehicleForm((prev) => ({ ...prev, ctDueDate: event.target.value }))
+                  }
+                />
+                <input
+                  type="number"
+                  className="rounded-xl border border-slate-200 px-3 py-2 text-sm"
+                  placeholder="Entretien à (km)"
+                  value={vehicleForm.serviceDueKm}
+                  onChange={(event) =>
+                    setVehicleForm((prev) => ({
+                      ...prev,
+                      serviceDueKm: event.target.value,
+                    }))
+                  }
+                />
+                <input
+                  type="date"
+                  className="rounded-xl border border-slate-200 px-3 py-2 text-sm"
+                  placeholder="Date entretien"
+                  value={vehicleForm.serviceDueDate}
+                  onChange={(event) =>
+                    setVehicleForm((prev) => ({
+                      ...prev,
+                      serviceDueDate: event.target.value,
+                    }))
+                  }
+                />
+                <select
+                  className="rounded-xl border border-slate-200 px-3 py-2 text-sm"
+                  value={vehicleForm.status}
+                  onChange={(event) =>
+                    setVehicleForm((prev) => ({
+                      ...prev,
+                      status: event.target.value as Vehicle["status"],
+                    }))
+                  }
+                >
+                  <option value="available">Disponible</option>
+                  <option value="reserved">Réservé</option>
+                  <option value="maintenance">Maintenance</option>
+                </select>
+                <div className="flex items-center gap-3">
+                  <button
+                    type="submit"
+                    className="flex-1 rounded-xl bg-emerald-600 py-2 text-sm font-semibold text-white disabled:opacity-60"
+                    disabled={vehicleFormSubmitting}
+                  >
+                    {vehicleFormMode === "edit" ? "Mettre à jour" : "Créer"}
+                  </button>
+                  {vehicleFormMode === "edit" && vehicleForm.id && (
+                    <button
+                      type="button"
+                      className="rounded-xl border border-slate-200 px-3 py-2 text-sm"
+                      onClick={() => handleVehicleDelete(vehicleForm.id!)}
+                    >
+                      Supprimer
+                    </button>
+                  )}
+                </div>
+                {vehicleFormError && (
+                  <p className="col-span-full rounded-xl bg-rose-50 px-3 py-2 text-sm text-rose-700">
+                    {vehicleFormError}
+                  </p>
+                )}
+              </form>
+
+              <div className="mt-6 overflow-hidden rounded-xl border border-slate-100">
+                <table className="min-w-full divide-y divide-slate-100 text-sm">
+                  <thead className="bg-slate-50 text-left text-xs font-semibold uppercase text-slate-500">
+                    <tr>
+                      <th className="px-3 py-2">Nom</th>
+                      <th className="px-3 py-2">Plaque</th>
+                      <th className="px-3 py-2">Département</th>
+                      <th className="px-3 py-2">Statut</th>
+                      <th className="px-3 py-2 text-right">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {vehiclesState.map((vehicle) => (
+                      <tr key={vehicle.id}>
+                        <td className="px-3 py-2 font-semibold text-slate-900">
+                          {vehicle.name}
+                        </td>
+                        <td className="px-3 py-2 text-slate-500">
+                          {vehicle.licensePlate}
+                        </td>
+                        <td className="px-3 py-2 text-slate-500">
+                          {getDepartmentName(vehicle.departmentId)}
+                        </td>
+                        <td className="px-3 py-2 text-slate-500 capitalize">
+                          {vehicle.status === "available"
+                            ? "Disponible"
+                            : vehicle.status === "reserved"
+                            ? "Réservé"
+                            : "Maintenance"}
+                        </td>
+                        <td className="px-3 py-2 text-right">
+                          <button
+                            className="text-sm font-semibold text-slate-600 underline"
+                            onClick={() => fillVehicleForm(vehicle)}
+                          >
+                            Éditer
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+        </section>
+
         <section className="grid gap-6 lg:grid-cols-2">
           <article className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
             <header className="mb-3 flex items-center justify-between">
@@ -619,17 +1047,27 @@ export default function Dashboard({
 
 function SessionBar({
   sessionUser,
+  welcomeInfo,
   onUserChange,
+  onLogout,
   selectedDepartment,
   onDepartmentChange,
+  departments,
+  users,
 }: {
-  sessionUser: User;
-  onUserChange: (user: User) => void;
+  sessionUser?: User;
+  welcomeInfo?: {
+    firstName: string;
+    lastName: string;
+    departmentId: string;
+  };
+  onUserChange: (user?: User) => void;
+  onLogout: () => void;
   selectedDepartment: string;
   onDepartmentChange: (deptId: string) => void;
+  departments: Department[];
+  users: User[];
 }) {
-  const canSwitchDepartment = sessionUser.role === "admin";
-
   return (
     <header className="flex flex-col gap-4 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:flex-row sm:items-center sm:justify-between">
       <div>
@@ -641,10 +1079,10 @@ function SessionBar({
           })}
         </p>
         <h1 className="text-2xl font-semibold text-slate-900">
-          Bonjour {sessionUser.fullName.split(" ")[0]},
+          Bonjour {welcomeInfo?.firstName || "Utilisateur"},
         </h1>
         <p className="text-sm text-slate-600">
-          Rôle : {sessionUser.role === "fleet_manager" ? "Référent flotte" : sessionUser.role}
+          Département : {departments.find(d => d.id === welcomeInfo?.departmentId)?.name || "Non spécifié"}
         </p>
       </div>
 
@@ -653,12 +1091,13 @@ function SessionBar({
           Utilisateur
           <select
             className="mt-1 min-w-[220px] rounded-xl border border-slate-200 px-3 py-2 text-sm"
-            value={sessionUser.id}
+            value={sessionUser?.id || ""}
             onChange={(event) => {
               const nextUser = users.find((user) => user.id === event.target.value);
               if (nextUser) onUserChange(nextUser);
             }}
           >
+            <option value="">Sélectionner un utilisateur</option>
             {users.map((user) => (
               <option key={user.id} value={user.id}>
                 {user.fullName} · {user.role}
@@ -673,9 +1112,8 @@ function SessionBar({
             className="mt-1 min-w-[200px] rounded-xl border border-slate-200 px-3 py-2 text-sm"
             value={selectedDepartment}
             onChange={(event) => onDepartmentChange(event.target.value)}
-            disabled={!canSwitchDepartment}
           >
-            {canSwitchDepartment && <option value="all">Tous les départements</option>}
+            <option value="all">Tous les départements</option>
             {departments.map((dept) => (
               <option key={dept.id} value={dept.id}>
                 {dept.name}
@@ -683,6 +1121,13 @@ function SessionBar({
             ))}
           </select>
         </label>
+        <button
+          type="button"
+          onClick={onLogout}
+          className="rounded-xl border border-slate-200 px-3 py-2 text-sm font-semibold text-slate-600 hover:border-slate-400"
+        >
+          Se déconnecter
+        </button>
       </div>
     </header>
   );
@@ -712,10 +1157,16 @@ function VehicleCard({
   vehicle,
   statusClass,
   formatDate,
+  canQuickBook = false,
+  bookingBusy = false,
+  onToggleBooking,
 }: {
   vehicle: Vehicle;
   statusClass: string;
   formatDate: (value?: string) => string;
+  canQuickBook?: boolean;
+  bookingBusy?: boolean;
+  onToggleBooking?: () => void;
 }) {
   return (
     <div className="rounded-2xl border border-slate-200 p-4">
@@ -752,6 +1203,20 @@ function VehicleCard({
           <dd>{vehicle.serviceDueKm.toLocaleString("fr-FR")} km</dd>
         </div>
       </dl>
+      {canQuickBook && (
+        <button
+          type="button"
+          disabled={vehicle.status === "maintenance" || bookingBusy}
+          onClick={onToggleBooking}
+          className="mt-4 w-full rounded-xl border border-slate-200 px-3 py-2 text-sm font-semibold text-slate-900 disabled:cursor-not-allowed disabled:opacity-60"
+        >
+          {bookingBusy
+            ? "Mise à jour…"
+            : vehicle.status === "available"
+            ? "Réserver"
+            : "Libérer"}
+        </button>
+      )}
     </div>
   );
 }

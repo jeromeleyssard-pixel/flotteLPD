@@ -1,9 +1,10 @@
 "use client";
 
+import { useState, useEffect } from "react";
 import Dashboard from "./Dashboard";
-import { users } from "@/lib/mockData";
 import { useSession } from "@/context/SessionContext";
-import { useState } from "react";
+import type { Department, User } from "@/lib/types";
+import { fetchDepartments } from "@/lib/api/fleet";
 
 export default function DashboardRoot() {
   const {
@@ -11,18 +12,34 @@ export default function DashboardRoot() {
     setSessionUser,
     hasAcknowledgedSafety,
     acknowledgeSafety,
+    users,
+    usersLoading,
+    welcomeInfo,
+    setWelcomeInfo,
   } = useSession();
 
+  // Si aucune information d'accueil n'est enregistrée, afficher le formulaire
+  if (!welcomeInfo) {
+    return <WelcomeForm onSubmit={setWelcomeInfo} />;
+  }
+
+  // Si aucun utilisateur n'est sélectionné, afficher la sélection simple
   if (!sessionUser) {
-    return <AuthGate onSelectUser={setSessionUser} />;
+    return (
+      <AuthGate
+        onSelectUser={setSessionUser}
+        users={users}
+        loading={usersLoading}
+      />
+    );
   }
 
   if (!hasAcknowledgedSafety) {
     return (
       <SafetyReminder
-        userName={sessionUser.fullName}
+        userName={`${welcomeInfo.firstName} ${welcomeInfo.lastName}`}
         onAcknowledge={acknowledgeSafety}
-        onLogout={() => setSessionUser(undefined)}
+        onLogout={() => setWelcomeInfo(undefined)}
       />
     );
   }
@@ -33,46 +50,10 @@ export default function DashboardRoot() {
       onSessionUserChange={(user) => {
         setSessionUser(user);
       }}
+      users={users}
+      onLogout={() => setWelcomeInfo(undefined)}
+      welcomeInfo={welcomeInfo}
     />
-  );
-}
-
-function AuthGate({
-  onSelectUser,
-}: {
-  onSelectUser: (user: (typeof users)[number]) => void;
-}) {
-  return (
-    <div className="flex min-h-screen items-center justify-center bg-slate-50 px-4">
-      <div className="w-full max-w-3xl space-y-6 rounded-3xl border border-slate-200 bg-white p-8 shadow-xl">
-        <header className="space-y-2 text-center">
-          <p className="text-sm font-semibold uppercase tracking-wide text-slate-500">
-            Accès sécurisé flotte véhicules
-          </p>
-          <h1 className="text-2xl font-semibold text-slate-900">
-            Connecte-toi pour gérer ta flotte
-          </h1>
-          <p className="text-sm text-slate-500">
-            Dans la version finale, la connexion se fera par lien e-mail ou SSO. Choisis un profil de test pour poursuivre.
-          </p>
-        </header>
-        <div className="grid gap-4 md:grid-cols-3">
-          {users.map((user) => (
-            <button
-              key={user.id}
-              onClick={() => onSelectUser(user)}
-              className="rounded-2xl border border-slate-200 p-4 text-left transition hover:border-slate-400"
-            >
-              <p className="text-sm font-semibold text-slate-900">{user.fullName}</p>
-              <p className="text-xs uppercase tracking-wide text-slate-500">{user.email}</p>
-              <span className="mt-2 inline-flex rounded-full bg-slate-100 px-2 py-1 text-xs text-slate-600">
-                {roleLabel(user.role)}
-              </span>
-            </button>
-          ))}
-        </div>
-      </div>
-    </div>
   );
 }
 
@@ -137,15 +118,176 @@ function SafetyReminder({
   );
 }
 
-function roleLabel(role: string) {
-  switch (role) {
-    case "driver":
-      return "Conducteur";
-    case "fleet_manager":
-      return "Référent flotte";
-    case "admin":
-      return "Admin régional";
-    default:
-      return role;
-  }
+function WelcomeForm({
+  onSubmit,
+}: {
+  onSubmit: (info: { firstName: string; lastName: string; departmentId: string }) => void;
+}) {
+  const [firstName, setFirstName] = useState("");
+  const [lastName, setLastName] = useState("");
+  const [departmentId, setDepartmentId] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [departments, setDepartments] = useState<Department[]>([]);
+  const [departmentsLoading, setDepartmentsLoading] = useState(true);
+
+  // Récupérer les départements depuis Supabase au chargement
+  useEffect(() => {
+    const loadDepartments = async () => {
+      try {
+        const departmentsData = await fetchDepartments();
+        setDepartments(departmentsData);
+      } catch (error) {
+        console.error("Erreur lors du chargement des départements:", error);
+        // Fallback : utiliser une liste par défaut pour éviter de bloquer l'application
+        console.log("Utilisation de la liste de départements par défaut");
+        setDepartments([
+          { id: "default-01", name: "Département 1" },
+          { id: "default-02", name: "Département 2" },
+          { id: "default-03", name: "Département 3" },
+        ]);
+      } finally {
+        setDepartmentsLoading(false);
+      }
+    };
+    loadDepartments();
+  }, []);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!firstName.trim() || !lastName.trim() || !departmentId) return;
+
+    setLoading(true);
+    onSubmit({
+      firstName: firstName.trim(),
+      lastName: lastName.trim(),
+      departmentId,
+    });
+  };
+
+  return (
+    <div className="flex min-h-screen items-center justify-center bg-slate-50 px-4">
+      <div className="w-full max-w-md space-y-6 rounded-3xl border border-slate-200 bg-white p-8 shadow-xl">
+        <header className="space-y-2 text-center">
+          <p className="text-sm font-semibold uppercase tracking-wide text-slate-500">
+            Bienvenue dans la flotte
+          </p>
+          <h1 className="text-2xl font-semibold text-slate-900">
+            Configurez votre profil
+          </h1>
+          <p className="text-sm text-slate-500">
+            Entrez vos informations pour accéder à l'application.
+          </p>
+        </header>
+
+        <form className="space-y-4" onSubmit={handleSubmit}>
+          <div>
+            <label className="block text-sm font-medium text-slate-700 mb-1">
+              Prénom
+            </label>
+            <input
+              type="text"
+              required
+              className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm"
+              value={firstName}
+              onChange={(e) => setFirstName(e.target.value)}
+              placeholder="Jean"
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-slate-700 mb-1">
+              Nom
+            </label>
+            <input
+              type="text"
+              required
+              className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm"
+              value={lastName}
+              onChange={(e) => setLastName(e.target.value)}
+              placeholder="Dupont"
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-slate-700 mb-1">
+              Département
+            </label>
+            <select
+              required
+              className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm"
+              value={departmentId}
+              onChange={(e) => setDepartmentId(e.target.value)}
+              disabled={departmentsLoading}
+            >
+              <option value="">
+                {departmentsLoading ? "Chargement..." : "Sélectionner un département"}
+              </option>
+              {departments.map((dept) => (
+                <option key={dept.id} value={dept.id}>
+                  {dept.name}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <button
+            type="submit"
+            disabled={loading || !firstName.trim() || !lastName.trim() || !departmentId}
+            className="w-full rounded-xl bg-emerald-600 py-2 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:bg-emerald-300"
+          >
+            {loading ? "Chargement..." : "Continuer"}
+          </button>
+        </form>
+      </div>
+    </div>
+  );
+}
+
+function AuthGate({
+  onSelectUser,
+  users,
+  loading,
+}: {
+  onSelectUser: (user: (typeof users)[number]) => void;
+  users: any[];
+  loading: boolean;
+}) {
+  return (
+    <div className="flex min-h-screen items-center justify-center bg-slate-50 px-4">
+      <div className="w-full max-w-3xl space-y-6 rounded-3xl border border-slate-200 bg-white p-8 shadow-xl">
+        <header className="space-y-2 text-center">
+          <p className="text-sm font-semibold uppercase tracking-wide text-slate-500">
+            Accès sécurisé flotte véhicules
+          </p>
+          <h1 className="text-2xl font-semibold text-slate-900">
+            Connecte-toi pour gérer ta flotte
+          </h1>
+          <p className="text-sm text-slate-500">
+            Sélectionnez votre profil pour accéder à l'application.
+          </p>
+        </header>
+        {loading ? (
+          <p className="text-center text-sm text-slate-500">
+            Chargement des profils utilisateurs…
+          </p>
+        ) : (
+          <div className="grid gap-4 md:grid-cols-3">
+            {users.map((user) => (
+              <button
+                key={user.id}
+                onClick={() => onSelectUser(user)}
+                className="rounded-2xl border border-slate-200 p-4 text-left transition hover:border-slate-400"
+              >
+                <p className="text-sm font-semibold text-slate-900">{user.fullName}</p>
+                <p className="text-xs uppercase tracking-wide text-slate-500">{user.email}</p>
+                <span className="mt-2 inline-flex rounded-full bg-slate-100 px-2 py-1 text-xs text-slate-600">
+                  {user.role}
+                </span>
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  );
 }

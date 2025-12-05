@@ -11,6 +11,7 @@ export interface Department {
 
 export interface User {
   id: string;
+  auth_user_id?: string;
   fullName: string;
   email: string;
   role: Role;
