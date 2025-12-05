@@ -23,17 +23,7 @@ export default function DashboardRoot() {
     return <WelcomeForm onSubmit={setWelcomeInfo} />;
   }
 
-  // Si aucun utilisateur n'est sélectionné, afficher la sélection simple
-  if (!sessionUser) {
-    return (
-      <AuthGate
-        onSelectUser={setSessionUser}
-        users={users}
-        loading={usersLoading}
-      />
-    );
-  }
-
+  // Si l'utilisateur n'a pas encore validé la sécurité, afficher le message
   if (!hasAcknowledgedSafety) {
     return (
       <SafetyReminder
@@ -46,10 +36,8 @@ export default function DashboardRoot() {
 
   return (
     <Dashboard
-      sessionUser={sessionUser}
-      onSessionUserChange={(user) => {
-        setSessionUser(user);
-      }}
+      sessionUser={sessionUser || undefined}
+      onSessionUserChange={setSessionUser}
       users={users}
       onLogout={() => setWelcomeInfo(undefined)}
       welcomeInfo={welcomeInfo}
@@ -258,51 +246,3 @@ function WelcomeForm({
   );
 }
 
-function AuthGate({
-  onSelectUser,
-  users,
-  loading,
-}: {
-  onSelectUser: (user: (typeof users)[number]) => void;
-  users: any[];
-  loading: boolean;
-}) {
-  return (
-    <div className="flex min-h-screen items-center justify-center bg-slate-50 px-4">
-      <div className="w-full max-w-3xl space-y-6 rounded-3xl border border-slate-200 bg-white p-8 shadow-xl">
-        <header className="space-y-2 text-center">
-          <p className="text-sm font-semibold uppercase tracking-wide text-slate-500">
-            Accès sécurisé flotte véhicules
-          </p>
-          <h1 className="text-2xl font-semibold text-slate-900">
-            Connecte-toi pour gérer ta flotte
-          </h1>
-          <p className="text-sm text-slate-500">
-            Sélectionnez votre profil pour accéder à l'application.
-          </p>
-        </header>
-        {loading ? (
-          <p className="text-center text-sm text-slate-500">
-            Chargement des profils utilisateurs…
-          </p>
-        ) : (
-          <div className="grid gap-4 md:grid-cols-3">
-            {users.map((user) => (
-              <button
-                key={user.id}
-                onClick={() => onSelectUser(user)}
-                className="rounded-2xl border border-slate-200 p-4 text-left transition hover:border-slate-400"
-              >
-                <p className="text-sm font-semibold text-slate-900">{user.fullName}</p>
-                <p className="text-xs uppercase tracking-wide text-slate-500">{user.email}</p>
-                <span className="mt-2 inline-flex rounded-full bg-slate-100 px-2 py-1 text-xs text-slate-600">
-                  {user.role}
-                </span>
-              </button>
-            ))}
-          </div>
-        )}
-      </div>
-    </div>
-  );
-}
