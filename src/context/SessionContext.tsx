@@ -51,7 +51,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
         try {
           setWelcomeInfoState(JSON.parse(stored));
         } catch (error) {
-          console.error("Erreur lors du chargement des infos d'accueil:", error);
+          // Erreur silencieuse en production
         }
       }
     }
@@ -64,7 +64,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       const fetched = await fetchUsers();
       setUsers(fetched);
     } catch (error) {
-      console.error("Unable to fetch users", error);
+      // Erreur silencieuse en production
     } finally {
       setUsersLoading(false);
     }

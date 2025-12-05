@@ -154,7 +154,6 @@ export default function Dashboard({
       setTripsState(snapshot.trips);
       setMaintenanceState(snapshot.maintenance);
     } catch (loadError) {
-      console.error("Fleet snapshot error", loadError);
       setError("Impossible de charger les données flotte. Réessaie dans un instant.");
     } finally {
       setLoading(false);
@@ -172,7 +171,6 @@ export default function Dashboard({
         prev.map((entry) => (entry.id === updated.id ? updated : entry)),
       );
     } catch (error) {
-      console.error("Booking toggle error", error);
       setBookingError("Impossible de mettre à jour la réservation pour le moment.");
     } finally {
       setBookingVehicleId(null);
@@ -300,7 +298,6 @@ export default function Dashboard({
       }
       resetVehicleForm();
     } catch (saveError) {
-      console.error("Vehicle save error", saveError);
       setVehicleFormError(
         "Impossible d'enregistrer le véhicule. Vérifie les champs et réessaie.",
       );
@@ -323,7 +320,6 @@ export default function Dashboard({
         resetVehicleForm();
       }
     } catch (deleteError) {
-      console.error("Vehicle delete error", deleteError);
       setVehicleFormError(
         "Suppression impossible pour le moment. Réessaie plus tard.",
       );

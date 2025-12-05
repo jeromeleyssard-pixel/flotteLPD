@@ -137,14 +137,8 @@ function WelcomeForm({
         const departmentsData = await fetchDepartments();
         setDepartments(departmentsData);
       } catch (error) {
-        console.error("Erreur lors du chargement des départements:", error);
-        // Fallback : utiliser une liste par défaut pour éviter de bloquer l'application
-        console.log("Utilisation de la liste de départements par défaut");
-        setDepartments([
-          { id: "default-01", name: "Département 1" },
-          { id: "default-02", name: "Département 2" },
-          { id: "default-03", name: "Département 3" },
-        ]);
+        // En cas d'erreur, continuer sans départements plutôt qu'avec des IDs fictifs
+        setDepartments([]);
       } finally {
         setDepartmentsLoading(false);
       }
