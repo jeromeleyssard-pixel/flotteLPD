@@ -164,20 +164,20 @@ function WelcomeForm({
               className="h-20 w-auto object-contain"
             />
           </div>
-          <p className="text-sm font-semibold uppercase tracking-wide text-slate-500">
+          <p className="text-sm font-semibold uppercase tracking-wide text-slate-600">
             Bienvenue dans la flotte
           </p>
           <h1 className="text-2xl font-semibold text-slate-900">
             Configurez votre profil
           </h1>
-          <p className="text-sm text-slate-500">
+          <p className="text-sm text-slate-700">
             Entrez vos informations pour accéder à l'application.
           </p>
         </header>
 
         <form className="space-y-4" onSubmit={handleSubmit}>
           <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1">
+            <label className="block text-sm font-semibold text-slate-800 mb-1">
               Prénom
             </label>
             <input
@@ -191,7 +191,7 @@ function WelcomeForm({
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1">
+            <label className="block text-sm font-semibold text-slate-800 mb-1">
               Nom
             </label>
             <input
@@ -205,7 +205,7 @@ function WelcomeForm({
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1">
+            <label className="block text-sm font-semibold text-slate-800 mb-1">
               Département
             </label>
             <select

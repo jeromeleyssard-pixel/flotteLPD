@@ -445,7 +445,7 @@ export default function Dashboard({
   if (loading) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-slate-50">
-        <p className="text-sm text-slate-500">Chargement des données flotte…</p>
+        <p className="text-sm text-slate-700">Chargement des données flotte…</p>
       </div>
     );
   }
@@ -493,11 +493,11 @@ export default function Dashboard({
               <header className="flex flex-wrap items-center justify-between gap-3">
                 <div>
                   <h2 className="text-lg font-semibold text-slate-900">Véhicules du département</h2>
-                  <p className="text-sm text-slate-500">
+                  <p className="text-sm text-slate-700">
                     Vue filtrée par {selectedDepartment === "all" ? "tous les départements" : getDepartmentName(selectedDepartment)}.
                   </p>
                 </div>
-                <span className="text-sm font-medium text-slate-500">
+                <span className="text-sm font-medium text-slate-700">
                   {filteredVehicles.length} véhicules
                 </span>
               </header>
@@ -691,7 +691,7 @@ export default function Dashboard({
           >
             <div>
               <h2 className="text-lg font-semibold text-slate-900">Gestion des véhicules</h2>
-              <p className="text-sm text-slate-500">Ajoutez, modifiez ou supprimez des véhicules</p>
+              <p className="text-sm text-slate-700">Ajoutez, modifiez ou supprimez des véhicules</p>
             </div>
             <div className="flex items-center gap-2">
               <button
@@ -909,7 +909,7 @@ export default function Dashboard({
             <header className="mb-3 flex items-center justify-between">
               <div>
                 <h2 className="text-lg font-semibold text-slate-900">Maintenance & alertes</h2>
-                <p className="text-sm text-slate-500">Préparez CT, vidanges et réparations.</p>
+                <p className="text-sm text-slate-700">Préparez CT, vidanges et réparations.</p>
               </div>
               <span className="rounded-full bg-rose-50 px-3 py-1 text-xs font-medium text-rose-700">
                 {filteredMaintenance.length} interventions
@@ -996,7 +996,7 @@ export default function Dashboard({
             <header className="mb-3 flex items-center justify-between">
               <div>
                 <h2 className="text-lg font-semibold text-slate-900">Historique des trajets</h2>
-                <p className="text-sm text-slate-500">5 derniers trajets validés.</p>
+                <p className="text-sm text-slate-700">5 derniers trajets validés.</p>
               </div>
               <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-600">
                 {recentTrips.length}
@@ -1090,7 +1090,7 @@ function SessionBar({
       </div>
 
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-        <label className="flex flex-col text-xs font-semibold uppercase tracking-wide text-slate-500">
+        <label className="flex flex-col text-xs font-semibold uppercase tracking-wide text-slate-700">
           Département
           <select
             className="mt-1 min-w-[200px] rounded-xl border border-slate-200 px-3 py-2 text-sm"
