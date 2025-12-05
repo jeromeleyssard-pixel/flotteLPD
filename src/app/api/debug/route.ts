@@ -4,7 +4,7 @@ import { supabase } from "@/lib/supabaseClient";
 export async function GET() {
   try {
     // Diagnostic des variables d'environnement
-    const diagnostics = {
+    const diagnostics: any = {
       env_vars: {
         supabase_url: process.env.NEXT_PUBLIC_SUPABASE_URL ? "✅ Set" : "❌ Missing",
         supabase_anon_key: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ? "✅ Set" : "❌ Missing",
@@ -14,6 +14,7 @@ export async function GET() {
         url: process.env.NEXT_PUBLIC_SUPABASE_URL,
         client_created: "✅ Yes",
       },
+      connection_test: null, // Will be populated below
     };
 
     // Test de connexion simple
