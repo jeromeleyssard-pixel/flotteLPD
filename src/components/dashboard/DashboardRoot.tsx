@@ -71,7 +71,14 @@ function SafetyReminder({
   return (
     <div className="flex min-h-screen items-center justify-center bg-slate-900/40 px-4">
       <div className="w-full max-w-2xl space-y-6 rounded-3xl border border-rose-200 bg-white p-8 text-slate-900 shadow-2xl">
-        <header className="space-y-2">
+        <header className="space-y-4">
+          <div className="flex justify-center">
+            <img 
+              src="/logo-petits-debrouillards.jpg" 
+              alt="Les Petits Débrouillards" 
+              className="h-16 w-auto object-contain"
+            />
+          </div>
           <p className="text-sm font-semibold uppercase tracking-wide text-rose-600">
             Prévention sécurité routière
           </p>
@@ -161,7 +168,14 @@ function WelcomeForm({
   return (
     <div className="flex min-h-screen items-center justify-center bg-slate-50 px-4">
       <div className="w-full max-w-md space-y-6 rounded-3xl border border-slate-200 bg-white p-8 shadow-xl">
-        <header className="space-y-2 text-center">
+        <header className="space-y-4 text-center">
+          <div className="flex justify-center">
+            <img 
+              src="/logo-petits-debrouillards.jpg" 
+              alt="Les Petits Débrouillards" 
+              className="h-20 w-auto object-contain"
+            />
+          </div>
           <p className="text-sm font-semibold uppercase tracking-wide text-slate-500">
             Bienvenue dans la flotte
           </p>

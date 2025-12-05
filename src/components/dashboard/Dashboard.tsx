@@ -1066,20 +1066,27 @@ function SessionBar({
 }) {
   return (
     <header className="flex flex-col gap-4 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:flex-row sm:items-center sm:justify-between">
-      <div>
-        <p className="text-sm text-slate-500">
-          {new Date().toLocaleDateString("fr-FR", {
-            weekday: "long",
-            day: "numeric",
-            month: "long",
-          })}
-        </p>
-        <h1 className="text-2xl font-semibold text-slate-900">
-          Bonjour {welcomeInfo?.firstName || "Utilisateur"},
-        </h1>
-        <p className="text-sm text-slate-600">
-          Département : {departments.find(d => d.id === welcomeInfo?.departmentId)?.name || "Non spécifié"}
-        </p>
+      <div className="flex items-center gap-4">
+        <img 
+          src="/logo-petits-debrouillards.jpg" 
+          alt="Les Petits Débrouillards" 
+          className="h-12 w-auto object-contain"
+        />
+        <div>
+          <p className="text-sm text-slate-500">
+            {new Date().toLocaleDateString("fr-FR", {
+              weekday: "long",
+              day: "numeric",
+              month: "long",
+            })}
+          </p>
+          <h1 className="text-2xl font-semibold text-slate-900">
+            Bonjour {welcomeInfo?.firstName || "Utilisateur"},
+          </h1>
+          <p className="text-sm text-slate-600">
+            Département : {departments.find(d => d.id === welcomeInfo?.departmentId)?.name || "Non spécifié"}
+          </p>
+        </div>
       </div>
 
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
