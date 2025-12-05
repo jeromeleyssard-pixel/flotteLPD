@@ -214,7 +214,9 @@ function WelcomeForm({
               disabled={departmentsLoading}
             >
               <option value="">
-                {departmentsLoading ? "Chargement..." : "Sélectionner un département"}
+                {departmentsLoading ? "Chargement..." : 
+                 departments.length === 0 ? "Aucun département disponible" : 
+                 "Sélectionner un département"}
               </option>
               {departments.map((dept) => (
                 <option key={dept.id} value={dept.id}>
@@ -222,6 +224,11 @@ function WelcomeForm({
                 </option>
               ))}
             </select>
+            {!departmentsLoading && departments.length === 0 && (
+              <p className="mt-2 text-xs text-amber-600">
+                ⚠️ Impossible de charger les départements. Vérifiez la configuration CORS dans Supabase.
+              </p>
+            )}
           </div>
 
           <button
