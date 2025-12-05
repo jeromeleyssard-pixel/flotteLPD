@@ -1084,25 +1084,6 @@ function SessionBar({
 
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
         <label className="flex flex-col text-xs font-semibold uppercase tracking-wide text-slate-500">
-          Utilisateur
-          <select
-            className="mt-1 min-w-[220px] rounded-xl border border-slate-200 px-3 py-2 text-sm"
-            value={sessionUser?.id || ""}
-            onChange={(event) => {
-              const nextUser = users.find((user) => user.id === event.target.value);
-              if (nextUser) onUserChange(nextUser);
-            }}
-          >
-            <option value="">Sélectionner un utilisateur</option>
-            {users.map((user) => (
-              <option key={user.id} value={user.id}>
-                {user.fullName} · {user.role}
-              </option>
-            ))}
-          </select>
-        </label>
-
-        <label className="flex flex-col text-xs font-semibold uppercase tracking-wide text-slate-500">
           Département
           <select
             className="mt-1 min-w-[200px] rounded-xl border border-slate-200 px-3 py-2 text-sm"
